@@ -1,0 +1,186 @@
+@model Note
+@{
+    ViewData["Title"] = Model.Title;
+    var isOwner = User.Identity?.IsAuthenticated == true &&
+                  User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value == Model.OwnerId.ToString();
+    var currentUserId = User.Identity?.IsAuthenticated == true
+        ? int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value)
+        : 0;
+}
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow mb-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h1 class="h2 mb-1">@Model.Title</h1>
+                        <div class="text-muted small">
+                            by <strong>@Model.Owner?.Username</strong> &bull;
+                            @Model.CreatedAt.ToString("MMM d, yyyy")
+                            @if (Model.IsPublic)
+                            {
+                                <span class="badge bg-success ms-1">Public</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary ms-1">Private</span>
+                            }
+                        </div>
+                    </div>
+                    @if (isOwner)
+                    {
+                        <div class="d-flex gap-2">
+                            <a href="/Notes/Edit/@Model.Id" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-pencil me-1"></i>Edit
+                            </a>
+                            <a href="/Notes/Delete/@Model.Id" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash me-1"></i>Delete
+                            </a>
+                        </div>
+                    }
+                </div>
+
+                <div class="note-content border-top pt-3">
+                    <pre class="note-body">@Model.Content</pre>
+                </div>
+
+                @if (Model.Attachments.Any())
+                {
+                    <div class="mt-4 border-top pt-3">
+                        <h5>Attachments</h5>
+                        <ul class="list-unstyled">
+                            @foreach (var att in Model.Attachments)
+                            {
+                                <li>
+                                    <a href="/Notes/Download?filePath=@att.FileName&fileName=@att.FileName">
+                                        <i class="bi bi-paperclip me-1"></i>@att.FileName
+                                    </a>
+                                    <small class="text-muted ms-2">@(att.Size / 1024) KB</small>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (isOwner)
+        {
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5>Share This Note</h5>
+                    <form method="post" action="/Notes/GenerateShareLink">
+                        <input type="hidden" name="noteId" value="@Model.Id" />
+                        <button type="submit" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-share me-1"></i>Generate Share Link
+                        </button>
+                    </form>
+                    @if (Model.ShareTokens.Any())
+                    {
+                        <div class="mt-2">
+                            <small class="text-muted">Existing share links: @Model.ShareTokens.Count</small>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <h4 class="mb-3">
+                    Ratings
+                    @if (Model.Ratings.Count > 0)
+                    {
+                        <span class="badge bg-warning text-dark ms-2">
+                            <i class="bi bi-star-fill"></i> @Model.AverageRating.ToString("F1")
+                        </span>
+                    }
+                </h4>
+
+                @if (User.Identity?.IsAuthenticated == true && !isOwner)
+                {
+                    <div class="card bg-light mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title">Leave a Rating</h5>
+                            <form method="post" action="/Ratings/Rate">
+                                <input type="hidden" name="NoteId" value="@Model.Id" />
+                                <div class="mb-3">
+                                    <label class="form-label">Stars</label>
+                                    <select name="Stars" class="form-select w-auto">
+                                        <option value="5">★★★★★ (5)</option>
+                                        <option value="4">★★★★☆ (4)</option>
+                                        <option value="3">★★★☆☆ (3)</option>
+                                        <option value="2">★★☆☆☆ (2)</option>
+                                        <option value="1">★☆☆☆☆ (1)</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Comment</label>
+                                    <textarea name="Comment" class="form-control" rows="3" placeholder="Leave a comment..."></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-sm">Submit Rating</button>
+                            </form>
+                        </div>
+                    </div>
+                }
+
+                @if (!Model.Ratings.Any())
+                {
+                    <p class="text-muted">No ratings yet.</p>
+                }
+                else
+                {
+                    @foreach (var rating in Model.Ratings.OrderByDescending(r => r.CreatedAt))
+                    {
+                        <div class="border-bottom pb-3 mb-3">
+                            <div class="d-flex justify-content-between">
+                                <strong>@rating.User?.Username</strong>
+                                <span class="text-warning">
+                                    @for (int i = 0; i < rating.Stars; i++) { <span>★</span> }
+                                    @for (int i = rating.Stars; i < 5; i++) { <span class="text-muted">☆</span> }
+                                </span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(rating.Comment))
+                            {
+                                <p class="mt-1 mb-0">@rating.Comment</p>
+                            }
+                            <small class="text-muted">@rating.CreatedAt.ToString("MMM d, yyyy")</small>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="text-muted text-uppercase small mb-3">Note Info</h6>
+                <dl class="row mb-0 small">
+                    <dt class="col-sm-5">Author</dt>
+                    <dd class="col-sm-7">@Model.Owner?.Username</dd>
+                    <dt class="col-sm-5">Created</dt>
+                    <dd class="col-sm-7">@Model.CreatedAt.ToString("MMM d, yyyy")</dd>
+                    <dt class="col-sm-5">Updated</dt>
+                    <dd class="col-sm-7">@Model.UpdatedAt.ToString("MMM d, yyyy")</dd>
+                    <dt class="col-sm-5">Visibility</dt>
+                    <dd class="col-sm-7">@(Model.IsPublic ? "Public" : "Private")</dd>
+                    <dt class="col-sm-5">Ratings</dt>
+                    <dd class="col-sm-7">@Model.Ratings.Count</dd>
+                    <dt class="col-sm-5">Attachments</dt>
+                    <dd class="col-sm-7">@Model.Attachments.Count</dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h6 class="text-muted text-uppercase small mb-2">View Raw Content</h6>
+                <a href="/Notes/RawContent/@Model.Id" target="_blank" class="btn btn-outline-secondary btn-sm w-100">
+                    <i class="bi bi-code-slash me-1"></i>Raw HTML View
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

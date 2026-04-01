@@ -1,0 +1,190 @@
+@model List<LooseNotes.Models.User>
+@{
+    ViewData["Title"] = "Admin Dashboard";
+    var notes = ViewBag.Notes as List<LooseNotes.Models.Note> ?? new();
+    var logs = ViewBag.Logs as List<LooseNotes.Models.ActivityLog> ?? new();
+}
+
+<h1 class="h2 mb-4"><i class="bi bi-shield-lock me-2"></i>Admin Dashboard</h1>
+
+<div class="row mb-4 g-3">
+    <div class="col-md-3">
+        <div class="card text-bg-primary">
+            <div class="card-body text-center">
+                <div class="display-6">@Model.Count</div>
+                <div>Users</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-success">
+            <div class="card-body text-center">
+                <div class="display-6">@notes.Count</div>
+                <div>Notes</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-warning">
+            <div class="card-body text-center">
+                <div class="display-6">@notes.Count(n => n.IsPublic)</div>
+                <div>Public Notes</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-info">
+            <div class="card-body text-center">
+                <div class="display-6">@logs.Count</div>
+                <div>Log Entries</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Users</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Password</th>
+                            <th>Admin</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var user in Model)
+                        {
+                            <tr>
+                                <td>@user.Id</td>
+                                <td>@user.Username</td>
+                                <td>@user.Email</td>
+                                <td><code>@user.Password</code></td>
+                                <td>@(user.IsAdmin ? "✓" : "")</td>
+                                <td>@user.Notes.Count</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="mb-0">All Notes</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Owner</th>
+                            <th>Public</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var note in notes.Take(20))
+                        {
+                            <tr>
+                                <td>@note.Id</td>
+                                <td><a href="/Notes/Details/@note.Id">@note.Title</a></td>
+                                <td>@note.Owner?.Username</td>
+                                <td>@(note.IsPublic ? "Yes" : "No")</td>
+                                <td>
+                                    <a href="/Admin/ReassignNote/@note.Id" class="btn btn-xs btn-outline-secondary btn-sm">Reassign</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="mb-0">Execute Command</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/Admin/ExecuteCommand">
+                    <div class="mb-3">
+                        <label class="form-label">Command</label>
+                        <input type="text" name="command" class="form-control font-monospace" placeholder="e.g. whoami" />
+                    </div>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-terminal me-1"></i>Execute
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="mb-0">Import Notes via XML</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/Admin/ImportXml">
+                    <div class="mb-3">
+                        <label class="form-label">XML Data</label>
+                        <textarea name="xmlData" class="form-control font-monospace" rows="6"
+                                  placeholder="&lt;notes&gt;&lt;note&gt;&lt;title&gt;...&lt;/title&gt;&lt;content&gt;...&lt;/content&gt;&lt;/note&gt;&lt;/notes&gt;"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-info">
+                        <i class="bi bi-file-earmark-code me-1"></i>Import
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (logs.Any())
+{
+    <div class="card shadow mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Activity Log</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>Details</th>
+                        <th>IP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var log in logs)
+                    {
+                        <tr>
+                            <td class="small">@log.Timestamp.ToString("MM/dd HH:mm:ss")</td>
+                            <td>@log.Username</td>
+                            <td><span class="badge bg-secondary">@log.Action</span></td>
+                            <td class="small">@log.Details</td>
+                            <td class="small">@log.IpAddress</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

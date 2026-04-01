@@ -1,0 +1,28 @@
+@{
+    ViewData["Title"] = "Command Execution";
+}
+
+<h1 class="h2 mb-4"><i class="bi bi-terminal me-2"></i>Command Execution</h1>
+
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <form method="post" action="/Admin/ExecuteCommand">
+            <div class="mb-3">
+                <label class="form-label">Command</label>
+                <input type="text" name="command" class="form-control font-monospace" autofocus />
+            </div>
+            <button type="submit" class="btn btn-warning">Execute</button>
+            <a href="/Admin" class="btn btn-outline-secondary ms-2">Back to Dashboard</a>
+        </form>
+    </div>
+</div>
+
+@if (ViewBag.CommandOutput != null)
+{
+    <div class="card shadow">
+        <div class="card-header">Output</div>
+        <div class="card-body">
+            <pre class="mb-0">@ViewBag.CommandOutput</pre>
+        </div>
+    </div>
+}

@@ -1,0 +1,43 @@
+@model LooseNotes.Models.Note
+@{
+    ViewData["Title"] = "Reassign Note";
+    var users = ViewBag.Users as List<LooseNotes.Models.User> ?? new();
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <h2 class="card-title mb-4">Reassign Note Ownership</h2>
+
+                <div class="bg-light p-3 rounded mb-4">
+                    <strong>Note:</strong> @Model.Title<br />
+                    <small class="text-muted">Current owner: @Model.Owner?.Username</small>
+                </div>
+
+                <form method="post" asp-action="ReassignNote" asp-route-noteId="@Model.Id">
+                    <div class="mb-3">
+                        <label class="form-label">New Owner</label>
+                        <select name="newOwnerId" class="form-select">
+                            @foreach (var user in users)
+                            {
+                                if (user.Id == Model.OwnerId)
+                                {
+                                    <option value="@user.Id" selected="selected">@user.Username (@user.Email)</option>
+                                }
+                                else
+                                {
+                                    <option value="@user.Id">@user.Username (@user.Email)</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">Reassign</button>
+                        <a href="/Admin" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

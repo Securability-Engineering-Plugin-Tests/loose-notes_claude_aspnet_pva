@@ -1,0 +1,47 @@
+body {
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    font-size: 1.3rem;
+}
+
+.note-body {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: inherit;
+    font-size: 1rem;
+    line-height: 1.6;
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+.card {
+    border: none;
+    border-radius: 0.5rem;
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid rgba(0,0,0,.08);
+    font-weight: 600;
+}
+
+.list-group-item-action:hover {
+    background-color: #f0f4ff;
+}
+
+pre.note-body {
+    background: transparent;
+    border: none;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+
+footer {
+    background-color: #f8f9fa !important;
+}

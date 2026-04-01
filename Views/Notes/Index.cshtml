@@ -1,0 +1,64 @@
+@model List<Note>
+@{
+    ViewData["Title"] = "My Notes";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h2 mb-0"><i class="bi bi-journal-text me-2"></i>My Notes</h1>
+    <a href="/Notes/Create" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-1"></i>New Note
+    </a>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">
+        You don't have any notes yet. <a href="/Notes/Create">Create your first note!</a>
+    </div>
+}
+else
+{
+    <div class="list-group">
+        @foreach (var note in Model)
+        {
+            <div class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <a href="/Notes/Details/@note.Id" class="fw-bold text-decoration-none">@note.Title</a>
+                            @if (note.IsPublic)
+                            {
+                                <span class="badge bg-success">Public</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Private</span>
+                            }
+                        </div>
+                        <p class="mb-1 text-muted small">
+                            @(note.Content.Length > 150 ? note.Content.Substring(0, 150) + "..." : note.Content)
+                        </p>
+                        <small class="text-muted">
+                            Updated @note.UpdatedAt.ToString("MMM d, yyyy")
+                            @if (note.Ratings.Count > 0)
+                            {
+                                <span class="ms-2">
+                                    <i class="bi bi-star-fill text-warning"></i>
+                                    @note.AverageRating.ToString("F1") (@note.Ratings.Count)
+                                </span>
+                            }
+                        </small>
+                    </div>
+                    <div class="d-flex gap-2 ms-3">
+                        <a href="/Notes/Edit/@note.Id" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <a href="/Notes/Delete/@note.Id" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
