@@ -27,7 +27,8 @@ public class RatingsController : Controller
         }
 
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        await _noteService.AddRatingAsync(model.NoteId, userId, model.Stars, model.Comment);
+        var userEmail = User.FindFirstValue("Email") ?? string.Empty;
+        await _noteService.AddRatingAsync(model.NoteId, userId, userEmail, model.Stars, model.Comment);
 
         TempData["Success"] = "Rating submitted successfully.";
         return RedirectToAction("Details", "Notes", new { id = model.NoteId });

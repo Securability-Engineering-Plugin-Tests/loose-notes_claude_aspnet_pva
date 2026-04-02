@@ -15,11 +15,13 @@ public class FileService
         _context = context;
         _configuration = configuration;
         _logger = logger;
-        _uploadsPath = Path.Combine(env.ContentRootPath, configuration["AppSettings:UploadsPath"] ?? "uploads");
+        _uploadsPath = Path.Combine(env.WebRootPath, "attachments");
 
         if (!Directory.Exists(_uploadsPath))
             Directory.CreateDirectory(_uploadsPath);
     }
+
+    public string GetAttachmentsBasePath() => _uploadsPath;
 
     public async Task<Attachment> SaveAttachmentAsync(int noteId, IFormFile file)
     {
@@ -46,16 +48,6 @@ public class FileService
         _context.Attachments.Add(attachment);
         await _context.SaveChangesAsync();
         return attachment;
-    }
-
-    public (byte[] data, string contentType, string fileName) DownloadFile(string filePath, string fileName)
-    {
-        var fullPath = Path.Combine(_uploadsPath, filePath);
-
-        _logger.LogInformation("File download request: {FilePath}", fullPath);
-
-        var data = File.ReadAllBytes(fullPath);
-        return (data, "application/octet-stream", fileName);
     }
 
     public async Task DeleteAttachmentAsync(int attachmentId)

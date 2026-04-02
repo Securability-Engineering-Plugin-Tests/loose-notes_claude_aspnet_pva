@@ -9,6 +9,7 @@ public class Note
     public int OwnerId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public string? Category { get; set; }
 
     public User? Owner { get; set; }
     public ICollection<Rating> Ratings { get; set; } = new List<Rating>();

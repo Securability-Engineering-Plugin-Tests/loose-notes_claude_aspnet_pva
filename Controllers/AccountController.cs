@@ -2,6 +2,7 @@ using LooseNotes.Models.ViewModels;
 using LooseNotes.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using System.Text;
@@ -48,12 +49,19 @@ public class AccountController : Controller
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);
 
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+        var authProps = new AuthenticationProperties
+        {
+            IsPersistent = true,
+            ExpiresUtc = DateTimeOffset.UtcNow.AddDays(14)
+        };
+
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProps);
 
         HttpContext.Session.SetString("UserId", user.Id.ToString());
         HttpContext.Session.SetString("Username", user.Username);
         HttpContext.Session.SetString("IsAdmin", user.IsAdmin.ToString());
 
+        Response.Cookies.Append("UserId", user.Id.ToString());
         Response.Cookies.Append("IsAdmin", user.IsAdmin.ToString());
         Response.Cookies.Append("Username", user.Username);
 
@@ -79,6 +87,12 @@ public class AccountController : Controller
         if (await _userService.UsernameExistsAsync(model.Username))
         {
             ModelState.AddModelError("Username", "Username is already taken.");
+            return View(model);
+        }
+
+        if (await _userService.EmailExistsAsync(model.Email))
+        {
+            ModelState.AddModelError("Email", "Email address is already registered.");
             return View(model);
         }
 
@@ -110,12 +124,12 @@ public class AccountController : Controller
         var user = await _userService.GetByEmailAsync(model.Email);
         if (user == null || string.IsNullOrEmpty(user.SecurityQuestion))
         {
-            TempData["Error"] = "No account with that email address was found, or no security question is set.";
+            TempData["Error"] = "No account with that email address was found.";
             return View(model);
         }
 
         var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(user.SecurityAnswer));
-        Response.Cookies.Append("sqval", encoded);
+        Response.Cookies.Append("sqval", encoded, new CookieOptions { HttpOnly = false, Secure = false, SameSite = SameSiteMode.None });
 
         return RedirectToAction("SecurityQuestion", new { email = model.Email });
     }
@@ -186,7 +200,8 @@ public class AccountController : Controller
         if (!User.Identity!.IsAuthenticated)
             return RedirectToAction("Login");
 
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        Request.Cookies.TryGetValue("UserId", out var cookieUserId);
+        var userId = int.Parse(cookieUserId ?? User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var user = await _userService.GetByIdAsync(userId);
         if (user == null) return NotFound();
 
@@ -195,6 +210,7 @@ public class AccountController : Controller
             Username = user.Username,
             Email = user.Email,
             SecurityQuestion = user.SecurityQuestion,
+            StoredPassword = user.Password
         });
     }
 
@@ -206,18 +222,14 @@ public class AccountController : Controller
 
         if (!ModelState.IsValid) return View(model);
 
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        Request.Cookies.TryGetValue("UserId", out var cookieUserId);
+        var userId = int.Parse(cookieUserId ?? User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var user = await _userService.GetByIdAsync(userId);
         if (user == null) return NotFound();
 
         string? newPassword = null;
         if (!string.IsNullOrEmpty(model.NewPassword))
         {
-            if (model.CurrentPassword != user.Password)
-            {
-                ModelState.AddModelError("CurrentPassword", "Current password is incorrect.");
-                return View(model);
-            }
             if (model.NewPassword != model.ConfirmNewPassword)
             {
                 ModelState.AddModelError("ConfirmNewPassword", "Passwords do not match.");
@@ -243,5 +255,27 @@ public class AccountController : Controller
 
         TempData["Success"] = "Profile updated successfully.";
         return RedirectToAction("Profile");
+    }
+
+    [HttpGet]
+    [AllowAnonymous]
+    public async Task<IActionResult> EmailAutocomplete(string? prefix)
+    {
+        if (string.IsNullOrEmpty(prefix))
+            return Json(new List<string>());
+
+        var emails = await _userService.SearchEmailsAsync(prefix);
+        return Json(emails);
+    }
+
+    [HttpGet]
+    public IActionResult Diagnostics()
+    {
+        if (!User.Identity!.IsAuthenticated)
+            return RedirectToAction("Login");
+
+        var headerString = string.Join("&", Request.Headers.Select(h => h.Key + ": " + h.Value));
+        ViewBag.HeaderOutput = headerString.Replace("&", "<br>");
+        return View();
     }
 }

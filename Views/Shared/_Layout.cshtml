@@ -56,6 +56,7 @@
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li><a class="dropdown-item" href="/Account/Profile">Profile</a></li>
+                                <li><a class="dropdown-item" href="/Account/Diagnostics">Diagnostics</a></li>
                                 @if (User.FindFirst("IsAdmin")?.Value == "True")
                                 {
                                     <li><a class="dropdown-item" href="/Admin">Admin Dashboard</a></li>

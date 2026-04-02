@@ -28,6 +28,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<NoteService>();
 builder.Services.AddScoped<FileService>();
+builder.Services.AddScoped<CryptoService>();
 
 builder.Services.AddSession(options =>
 {
@@ -64,8 +65,9 @@ app.MapControllerRoute(
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
     db.Database.EnsureCreated();
-    DbSeeder.Seed(db);
+    DbSeeder.Seed(db, config);
 }
 
 app.Run();

@@ -1,0 +1,21 @@
+@{
+    ViewData["Title"] = "Reset Database";
+}
+
+<div class="card shadow">
+    <div class="card-body p-4">
+        <h2 class="card-title mb-4"><i class="bi bi-database-exclamation me-2"></i>Reset Database</h2>
+        <div class="alert alert-danger">
+            <strong>Warning:</strong> This will delete and recreate the database using the supplied connection string.
+        </div>
+        <form method="post" asp-action="ResetDatabase">
+            <div class="mb-3">
+                <label for="connectionString" class="form-label">Connection String</label>
+                <input type="text" id="connectionString" name="connectionString" class="form-control font-monospace"
+                       placeholder="Data Source=loosenotes.db" />
+            </div>
+            <button type="submit" class="btn btn-danger">Reset Database</button>
+            <a href="/Admin" class="btn btn-secondary ms-2">Cancel</a>
+        </form>
+    </div>
+</div>

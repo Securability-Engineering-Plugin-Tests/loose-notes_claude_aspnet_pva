@@ -19,9 +19,10 @@ public class HomeController : Controller
         return View(notes);
     }
 
-    public async Task<IActionResult> TopRated()
+    public async Task<IActionResult> TopRated(string? category)
     {
-        var notes = await _noteService.GetTopRatedNotesAsync(10);
+        var notes = await _noteService.GetTopRatedNotesAsync(10, category);
+        ViewBag.Category = category;
         return View(notes);
     }
 

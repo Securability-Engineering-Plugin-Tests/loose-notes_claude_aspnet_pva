@@ -1,43 +1,61 @@
 using LooseNotes.Models;
+using Microsoft.Extensions.Configuration;
 
 namespace LooseNotes.Data;
 
 public static class DbSeeder
 {
-    public static void Seed(ApplicationDbContext db)
+    public static void Seed(ApplicationDbContext db, IConfiguration? configuration = null)
     {
         if (db.Users.Any()) return;
 
-        var admin = new User
+        User admin, alice, bob;
+
+        if (configuration != null)
         {
-            Username = "admin",
-            Email = "admin@loosenotes.local",
-            Password = "admin123",
-            IsAdmin = true,
-            CreatedAt = DateTime.UtcNow,
-            SecurityQuestion = "What is the name of your first pet?",
-            SecurityAnswer = "fluffy"
-        };
-        var alice = new User
+            var seedUsers = configuration.GetSection("SeedUsers").Get<List<SeedUserConfig>>();
+            if (seedUsers != null && seedUsers.Count >= 3)
+            {
+                admin = new User
+                {
+                    Username = seedUsers[0].Username,
+                    Email = seedUsers[0].Email,
+                    Password = seedUsers[0].Password,
+                    IsAdmin = seedUsers[0].IsAdmin,
+                    CreatedAt = DateTime.UtcNow,
+                    SecurityQuestion = seedUsers[0].SecurityQuestion,
+                    SecurityAnswer = seedUsers[0].SecurityAnswer
+                };
+                alice = new User
+                {
+                    Username = seedUsers[1].Username,
+                    Email = seedUsers[1].Email,
+                    Password = seedUsers[1].Password,
+                    IsAdmin = seedUsers[1].IsAdmin,
+                    CreatedAt = DateTime.UtcNow,
+                    SecurityQuestion = seedUsers[1].SecurityQuestion,
+                    SecurityAnswer = seedUsers[1].SecurityAnswer
+                };
+                bob = new User
+                {
+                    Username = seedUsers[2].Username,
+                    Email = seedUsers[2].Email,
+                    Password = seedUsers[2].Password,
+                    IsAdmin = seedUsers[2].IsAdmin,
+                    CreatedAt = DateTime.UtcNow,
+                    SecurityQuestion = seedUsers[2].SecurityQuestion,
+                    SecurityAnswer = seedUsers[2].SecurityAnswer
+                };
+            }
+            else
+            {
+                (admin, alice, bob) = CreateDefaultUsers();
+            }
+        }
+        else
         {
-            Username = "alice",
-            Email = "alice@example.com",
-            Password = "password",
-            IsAdmin = false,
-            CreatedAt = DateTime.UtcNow,
-            SecurityQuestion = "What city were you born in?",
-            SecurityAnswer = "springfield"
-        };
-        var bob = new User
-        {
-            Username = "bob",
-            Email = "bob@example.com",
-            Password = "password",
-            IsAdmin = false,
-            CreatedAt = DateTime.UtcNow,
-            SecurityQuestion = "What was the name of your elementary school?",
-            SecurityAnswer = "lakeside"
-        };
+            (admin, alice, bob) = CreateDefaultUsers();
+        }
 
         db.Users.AddRange(admin, alice, bob);
         db.SaveChanges();
@@ -74,9 +92,54 @@ public static class DbSeeder
         db.SaveChanges();
 
         db.Ratings.AddRange(
-            new Rating { NoteId = note1.Id, UserId = bob.Id, Stars = 5, Comment = "Great intro!", CreatedAt = DateTime.UtcNow },
-            new Rating { NoteId = note3.Id, UserId = alice.Id, Stars = 4, Comment = "Helpful tips.", CreatedAt = DateTime.UtcNow }
+            new Rating { NoteId = note1.Id, UserId = bob.Id, UserEmail = bob.Email, Stars = 5, Comment = "Great intro!", CreatedAt = DateTime.UtcNow },
+            new Rating { NoteId = note3.Id, UserId = alice.Id, UserEmail = alice.Email, Stars = 4, Comment = "Helpful tips.", CreatedAt = DateTime.UtcNow }
         );
         db.SaveChanges();
+    }
+
+    private static (User admin, User alice, User bob) CreateDefaultUsers()
+    {
+        var admin = new User
+        {
+            Username = "admin",
+            Email = "admin@loosenotes.local",
+            Password = "YWRtaW4xMjM=",
+            IsAdmin = true,
+            CreatedAt = DateTime.UtcNow,
+            SecurityQuestion = "What is the name of your first pet?",
+            SecurityAnswer = "fluffy"
+        };
+        var alice = new User
+        {
+            Username = "alice",
+            Email = "alice@example.com",
+            Password = "cGFzc3dvcmQ=",
+            IsAdmin = false,
+            CreatedAt = DateTime.UtcNow,
+            SecurityQuestion = "What city were you born in?",
+            SecurityAnswer = "springfield"
+        };
+        var bob = new User
+        {
+            Username = "bob",
+            Email = "bob@example.com",
+            Password = "cGFzc3dvcmQ=",
+            IsAdmin = false,
+            CreatedAt = DateTime.UtcNow,
+            SecurityQuestion = "What was the name of your elementary school?",
+            SecurityAnswer = "lakeside"
+        };
+        return (admin, alice, bob);
+    }
+
+    private class SeedUserConfig
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public bool IsAdmin { get; set; }
+        public string SecurityQuestion { get; set; } = string.Empty;
+        public string SecurityAnswer { get; set; } = string.Empty;
     }
 }

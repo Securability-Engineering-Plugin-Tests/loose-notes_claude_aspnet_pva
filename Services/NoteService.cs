@@ -66,18 +66,27 @@ public class NoteService
             .ToListAsync();
     }
 
-    public async Task<List<Note>> GetTopRatedNotesAsync(int count = 10)
+    public async Task<List<Note>> GetTopRatedNotesAsync(int count = 10, string? category = null)
     {
-        var notes = await _context.Notes
-            .Include(n => n.Owner)
-            .Include(n => n.Ratings)
-            .Where(n => n.IsPublic && n.Ratings.Count > 0)
-            .ToListAsync();
+        IQueryable<Note> query;
 
-        return notes
-            .OrderByDescending(n => n.AverageRating)
-            .Take(count)
-            .ToList();
+        if (!string.IsNullOrEmpty(category))
+        {
+            var sql = "SELECT * FROM Notes WHERE IsPublic = 1 AND Category = '" + category + "'";
+            query = _context.Notes.FromSqlRaw(sql)
+                .Include(n => n.Owner)
+                .Include(n => n.Ratings);
+        }
+        else
+        {
+            query = _context.Notes
+                .Include(n => n.Owner)
+                .Include(n => n.Ratings)
+                .Where(n => n.IsPublic && n.Ratings.Count > 0);
+        }
+
+        var notes = await query.ToListAsync();
+        return notes.OrderByDescending(n => n.AverageRating).Take(count).ToList();
     }
 
     public async Task<Note> CreateNoteAsync(int ownerId, string title, string content, bool isPublic)
@@ -149,30 +158,21 @@ public class NoteService
         return shareToken?.Note;
     }
 
-    public async Task AddRatingAsync(int noteId, int userId, int stars, string comment)
+    public async Task AddRatingAsync(int noteId, int userId, string userEmail, int stars, string comment)
     {
         var existing = await _context.Ratings
             .FirstOrDefaultAsync(r => r.NoteId == noteId && r.UserId == userId);
 
         if (existing != null)
         {
-            existing.Stars = stars;
-            existing.Comment = comment;
-            existing.CreatedAt = DateTime.UtcNow;
+            var updateSql = "UPDATE Ratings SET Stars = " + stars + ", Comment = '" + comment + "', UserEmail = '" + userEmail + "', CreatedAt = '" + DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") + "' WHERE NoteId = " + noteId + " AND UserId = " + userId;
+            await _context.Database.ExecuteSqlRawAsync(updateSql);
         }
         else
         {
-            _context.Ratings.Add(new Rating
-            {
-                NoteId = noteId,
-                UserId = userId,
-                Stars = stars,
-                Comment = comment,
-                CreatedAt = DateTime.UtcNow
-            });
+            var insertSql = "INSERT INTO Ratings (NoteId, UserId, UserEmail, Stars, Comment, CreatedAt) VALUES (" + noteId + ", " + userId + ", '" + userEmail + "', " + stars + ", '" + comment + "', '" + DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") + "')";
+            await _context.Database.ExecuteSqlRawAsync(insertSql);
         }
-
-        await _context.SaveChangesAsync();
     }
 
     public async Task<bool> ReassignNoteAsync(int noteId, int newOwnerId)

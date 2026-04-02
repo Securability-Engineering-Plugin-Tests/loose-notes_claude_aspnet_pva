@@ -21,4 +21,6 @@ public class ProfileViewModel
 
     [Display(Name = "Security Answer")]
     public string? SecurityAnswer { get; set; }
+
+    public string? StoredPassword { get; set; }
 }

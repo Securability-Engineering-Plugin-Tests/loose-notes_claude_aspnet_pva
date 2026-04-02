@@ -1,0 +1,12 @@
+@{
+    ViewData["Title"] = "File Not Found";
+}
+
+<div class="container py-5">
+    <div class="alert alert-warning">
+        <h4 class="alert-heading">File Not Found</h4>
+        <p>The requested file was not found: @Html.Raw(ViewBag.Filename)</p>
+        <hr>
+        <p class="mb-0"><a href="/Notes" class="alert-link">Return to My Notes</a></p>
+    </div>
+</div>

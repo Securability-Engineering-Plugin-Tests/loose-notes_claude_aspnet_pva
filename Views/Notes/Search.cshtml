@@ -33,7 +33,7 @@
                 <a href="/Notes/Details/@note.Id" class="list-group-item list-group-item-action">
                     <div class="d-flex w-100 justify-content-between align-items-center">
                         <div>
-                            <strong>@note.Title</strong>
+                            <strong>@Html.Raw(note.Title)</strong>
                             <small class="text-muted ms-2">by @note.Owner?.Username</small>
                             @if (note.IsPublic)
                             {
@@ -52,7 +52,7 @@
                         }
                     </div>
                     <p class="mb-0 mt-1 text-muted small">
-                        @(note.Content.Length > 200 ? note.Content.Substring(0, 200) + "..." : note.Content)
+                        @Html.Raw(note.Content.Length > 200 ? note.Content.Substring(0, 200) + "..." : note.Content)
                     </p>
                 </a>
             }

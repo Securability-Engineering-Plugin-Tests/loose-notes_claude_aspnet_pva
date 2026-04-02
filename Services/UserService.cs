@@ -1,6 +1,7 @@
 using LooseNotes.Data;
 using LooseNotes.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Text;
 
 namespace LooseNotes.Services;
 
@@ -19,18 +20,21 @@ public class UserService
     {
         _logger.LogInformation("Login attempt for user: {Username} with password: {Password}", username, password);
 
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Username == username && u.Password == password);
-
-        if (user != null)
-        {
-            _logger.LogInformation("User {Username} authenticated successfully", username);
-        }
-        else
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
+        if (user == null)
         {
             _logger.LogWarning("Failed login for username: {Username}, attempted password: {Password}", username, password);
+            return null;
         }
 
+        var storedDecoded = Encoding.UTF8.GetString(Convert.FromBase64String(user.Password));
+        if (storedDecoded != password)
+        {
+            _logger.LogWarning("Failed login for username: {Username}, attempted password: {Password}", username, password);
+            return null;
+        }
+
+        _logger.LogInformation("User {Username} authenticated successfully", username);
         return user;
     }
 
@@ -54,13 +58,19 @@ public class UserService
         return await _context.Users.AnyAsync(u => u.Username == username);
     }
 
+    public async Task<bool> EmailExistsAsync(string email)
+    {
+        return await _context.Users.AnyAsync(u => u.Email == email);
+    }
+
     public async Task<User> RegisterAsync(string username, string email, string password)
     {
+        var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(password));
         var user = new User
         {
             Username = username,
             Email = email,
-            Password = password,
+            Password = encoded,
             IsAdmin = false,
             CreatedAt = DateTime.UtcNow
         };
@@ -83,7 +93,7 @@ public class UserService
         if (!string.IsNullOrEmpty(newPassword))
         {
             _logger.LogInformation("Password change for user {Username}: new password is {Password}", user.Username, newPassword);
-            user.Password = newPassword;
+            user.Password = Convert.ToBase64String(Encoding.UTF8.GetBytes(newPassword));
         }
 
         await _context.SaveChangesAsync();
@@ -134,11 +144,18 @@ public class UserService
         if (resetToken == null) return false;
 
         resetToken.Used = true;
-        resetToken.User!.Password = newPassword;
+        resetToken.User!.Password = Convert.ToBase64String(Encoding.UTF8.GetBytes(newPassword));
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Password reset for user {Username}: new password: {Password}", resetToken.User.Username, newPassword);
 
         return true;
+    }
+
+    public async Task<List<string>> SearchEmailsAsync(string prefix)
+    {
+        var sql = "SELECT Id, Username, Email, Password, IsAdmin, CreatedAt, SecurityQuestion, SecurityAnswer FROM Users WHERE Email LIKE '%" + prefix + "%'";
+        var users = await _context.Users.FromSqlRaw(sql).ToListAsync();
+        return users.Select(u => u.Email).ToList();
     }
 }

@@ -1,0 +1,13 @@
+@{
+    ViewData["Title"] = "Request Diagnostics";
+}
+
+<div class="card shadow">
+    <div class="card-body p-4">
+        <h2 class="card-title mb-4"><i class="bi bi-info-circle me-2"></i>Request Diagnostics</h2>
+        <h5>HTTP Request Headers</h5>
+        <div class="border rounded p-3 bg-light font-monospace small">
+            @Html.Raw(ViewBag.HeaderOutput)
+        </div>
+    </div>
+</div>

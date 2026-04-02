@@ -10,6 +10,14 @@
                 <h2 class="card-title mb-4">
                     <i class="bi bi-person-circle me-2"></i>My Profile
                 </h2>
+
+                @if (Model.StoredPassword != null)
+                {
+                    <div class="alert alert-secondary mb-4">
+                        <strong>Account Credential:</strong> <span id="storedCred">@Model.StoredPassword</span>
+                    </div>
+                }
+
                 <form method="post" asp-action="Profile">
                     <div asp-validation-summary="ModelOnly" class="alert alert-danger" style="display:@(ViewContext.ModelState.IsValid ? "none" : "block")"></div>
 
@@ -27,10 +35,6 @@
                     <hr />
                     <h5>Change Password <small class="text-muted fs-6">(optional)</small></h5>
 
-                    <div class="mb-3">
-                        <label asp-for="CurrentPassword" class="form-label">Current Password</label>
-                        <input asp-for="CurrentPassword" type="password" class="form-control" />
-                    </div>
                     <div class="mb-3">
                         <label asp-for="NewPassword" class="form-label">New Password</label>
                         <input asp-for="NewPassword" type="password" class="form-control" />

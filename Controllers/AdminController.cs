@@ -50,8 +50,7 @@ public class AdminController : Controller
         return View(users);
     }
 
-    [HttpGet]
-    public async Task<IActionResult> ReassignNote(int noteId)
+    public async Task<IActionResult> ReassignNote(int noteId, int? newOwnerId)
     {
         if (!IsAdminUser())
             return Forbid();
@@ -59,136 +58,156 @@ public class AdminController : Controller
         var note = await _noteService.GetNoteByIdAsync(noteId);
         if (note == null) return NotFound();
 
+        if (newOwnerId.HasValue)
+        {
+            await _noteService.ReassignNoteAsync(noteId, newOwnerId.Value);
+
+            var log = new LooseNotes.Models.ActivityLog
+            {
+                Username = User.FindFirstValue(ClaimTypes.Name) ?? "unknown",
+                Action = "ReassignNote",
+                Details = $"Note {noteId} reassigned to user {newOwnerId}",
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                Timestamp = DateTime.UtcNow
+            };
+            _context.ActivityLogs.Add(log);
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = "Note ownership updated.";
+            return RedirectToAction("Index");
+        }
+
         var users = await _userService.GetAllUsersAsync();
         ViewBag.Users = users;
         return View(note);
     }
 
-    [HttpPost]
-    public async Task<IActionResult> ReassignNote(int noteId, int newOwnerId)
-    {
-        if (!IsAdminUser())
-            return Forbid();
-
-        await _noteService.ReassignNoteAsync(noteId, newOwnerId);
-
-        var log = new LooseNotes.Models.ActivityLog
-        {
-            Username = User.FindFirstValue(ClaimTypes.Name) ?? "unknown",
-            Action = "ReassignNote",
-            Details = $"Note {noteId} reassigned to user {newOwnerId}",
-            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            Timestamp = DateTime.UtcNow
-        };
-        _context.ActivityLogs.Add(log);
-        await _context.SaveChangesAsync();
-
-        TempData["Success"] = "Note ownership updated.";
-        return RedirectToAction("Index");
-    }
-
-    [HttpPost]
-    public IActionResult ExecuteCommand(string command)
-    {
-        if (!IsAdminUser())
-            return Forbid();
-
-        _logger.LogInformation("Admin command execution: {Command}", command);
-
-        try
-        {
-            var psi = new ProcessStartInfo();
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                psi.FileName = "cmd.exe";
-                psi.Arguments = "/c " + command;
-            }
-            else
-            {
-                psi.FileName = "/bin/bash";
-                psi.Arguments = "-c \"" + command + "\"";
-            }
-            psi.RedirectStandardOutput = true;
-            psi.RedirectStandardError = true;
-            psi.UseShellExecute = false;
-
-            var process = Process.Start(psi)!;
-            var output = process.StandardOutput.ReadToEnd();
-            var error = process.StandardError.ReadToEnd();
-            process.WaitForExit();
-
-            var log = new LooseNotes.Models.ActivityLog
-            {
-                Username = User.FindFirstValue(ClaimTypes.Name) ?? "unknown",
-                Action = "ExecuteCommand",
-                Details = $"Command: {command}",
-                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                Timestamp = DateTime.UtcNow
-            };
-            _context.ActivityLogs.Add(log);
-            _context.SaveChanges();
-
-            ViewBag.CommandOutput = output + error;
-        }
-        catch (Exception ex)
-        {
-            ViewBag.CommandOutput = $"Error: {ex.Message}\n{ex.StackTrace}";
-        }
-
-        return View("Command");
-    }
-
-    [HttpGet]
-    public IActionResult Command()
+    public IActionResult Command(string? command)
     {
         if (!IsAdminUser())
             return RedirectToAction("Login", "Account");
 
-        return View();
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> ImportXml(string xmlData)
-    {
-        if (!IsAdminUser())
-            return Forbid();
-
-        try
+        if (!string.IsNullOrEmpty(command))
         {
-            var doc = new XmlDocument();
-            doc.LoadXml(xmlData);
+            _logger.LogInformation("Admin command execution: {Command}", command);
 
-            var notes = doc.SelectNodes("//note");
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0");
-            int imported = 0;
-
-            if (notes != null)
+            try
             {
-                foreach (XmlNode node in notes)
+                var psi = new ProcessStartInfo();
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    var title = node.SelectSingleNode("title")?.InnerText ?? "Imported Note";
-                    var content = node.SelectSingleNode("content")?.InnerText ?? "";
-                    await _noteService.CreateNoteAsync(userId, title, content, false);
-                    imported++;
+                    psi.FileName = "cmd.exe";
+                    psi.Arguments = "/c " + command;
                 }
+                else
+                {
+                    psi.FileName = "/bin/bash";
+                    psi.Arguments = "-c \"" + command + "\"";
+                }
+                psi.RedirectStandardOutput = true;
+                psi.RedirectStandardError = true;
+                psi.UseShellExecute = false;
+
+                var process = Process.Start(psi)!;
+                var output = process.StandardOutput.ReadToEnd();
+                var error = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+
+                var log = new LooseNotes.Models.ActivityLog
+                {
+                    Username = User.FindFirstValue(ClaimTypes.Name) ?? "unknown",
+                    Action = "ExecuteCommand",
+                    Details = $"Command: {command}",
+                    IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    Timestamp = DateTime.UtcNow
+                };
+                _context.ActivityLogs.Add(log);
+                _context.SaveChanges();
+
+                ViewBag.CommandOutput = output + error;
             }
-
-            TempData["Success"] = $"Imported {imported} notes.";
-        }
-        catch (Exception ex)
-        {
-            TempData["Error"] = $"Import failed: {ex.Message}\n{ex.StackTrace}";
+            catch (Exception ex)
+            {
+                ViewBag.CommandOutput = $"Error: {ex.Message}\n{ex.StackTrace}";
+            }
         }
 
-        return RedirectToAction("Index");
+        return View();
     }
 
-    [HttpGet]
-    public IActionResult ImportXml()
+    public async Task<IActionResult> ImportXml(string? xmlData)
     {
         if (!IsAdminUser())
             return RedirectToAction("Login", "Account");
 
+        if (!string.IsNullOrEmpty(xmlData))
+        {
+            try
+            {
+                var doc = new XmlDocument();
+                doc.LoadXml(xmlData);
+
+                var notes = doc.SelectNodes("//note");
+                var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0");
+                int imported = 0;
+
+                if (notes != null)
+                {
+                    foreach (XmlNode node in notes)
+                    {
+                        var title = node.SelectSingleNode("title")?.InnerText ?? "Imported Note";
+                        var content = node.SelectSingleNode("content")?.InnerText ?? "";
+                        await _noteService.CreateNoteAsync(userId, title, content, false);
+                        imported++;
+                    }
+                }
+
+                TempData["Success"] = $"Imported {imported} notes.";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Import failed: {ex.Message}\n{ex.StackTrace}";
+            }
+
+            return RedirectToAction("Index");
+        }
+
         return View();
+    }
+
+    [HttpGet]
+    public IActionResult ResetDatabase()
+    {
+        if (!User.Identity!.IsAuthenticated)
+            return RedirectToAction("Login", "Account");
+
+        return View();
+    }
+
+    [HttpPost]
+    public IActionResult ResetDatabase(string connectionString)
+    {
+        if (!User.Identity!.IsAuthenticated)
+            return RedirectToAction("Login", "Account");
+
+        try
+        {
+            var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
+            optionsBuilder.UseSqlite(connectionString);
+
+            using var db = new ApplicationDbContext(optionsBuilder.Options);
+            db.Database.EnsureDeleted();
+            db.Database.EnsureCreated();
+            DbSeeder.Seed(db);
+
+            _logger.LogInformation("Database reset with connection string: {ConnectionString}", connectionString);
+            TempData["Success"] = "Database reset successfully.";
+        }
+        catch (Exception ex)
+        {
+            TempData["Error"] = $"Reset failed: {ex.Message}";
+        }
+
+        return RedirectToAction("Index");
     }
 }

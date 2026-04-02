@@ -4,7 +4,14 @@
       "Bash(dotnet build:*)",
       "Bash(echo \"EXIT:$?\")",
       "Bash(cmd /c \"cd /d G:\\\\Generated\\\\LooseNotes\\\\src\\\\aspnet\\\\pva && dotnet build --nologo 2>&1\")",
-      "Bash(powershell -Command \"Set-Location 'G:\\\\Generated\\\\LooseNotes\\\\src\\\\aspnet\\\\pva'; dotnet build --nologo 2>&1 | Write-Output\" 2>&1)"
+      "Bash(powershell -Command \"Set-Location 'G:\\\\Generated\\\\LooseNotes\\\\src\\\\aspnet\\\\pva'; dotnet build --nologo 2>&1 | Write-Output\" 2>&1)",
+      "Bash(cmd:*)",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(dotnet:*)",
+      "Bash(1)",
+      "Bash(tee /dev/stderr)",
+      "Bash(printf %s\\\\n:*)"
     ]
   }
 }

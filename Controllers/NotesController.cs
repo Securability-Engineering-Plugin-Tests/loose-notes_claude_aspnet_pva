@@ -132,7 +132,6 @@ public class NotesController : Controller
         return View(note);
     }
 
-    [HttpPost, ActionName("Delete")]
     public async Task<IActionResult> DeleteConfirmed(int id)
     {
         if (!User.Identity!.IsAuthenticated)
@@ -182,13 +181,22 @@ public class NotesController : Controller
     }
 
     [HttpGet]
-    public IActionResult Download(string filePath, string fileName)
+    public IActionResult Download(string filename)
     {
-        var (data, contentType, name) = _fileService.DownloadFile(filePath, fileName);
-        return File(data, contentType, name);
-    }
+        var attachmentsDir = _fileService.GetAttachmentsBasePath();
+        var fullPath = Path.Combine(attachmentsDir, filename);
 
-    // ── Export ────────────────────────────────────────────────────────────────
+        _logger.LogInformation("File download request: {FilePath}", fullPath);
+
+        if (!System.IO.File.Exists(fullPath))
+        {
+            ViewBag.Filename = filename;
+            return View("DownloadError");
+        }
+
+        var data = System.IO.File.ReadAllBytes(fullPath);
+        return File(data, "application/octet-stream", filename);
+    }
 
     [HttpGet]
     public async Task<IActionResult> Export()
@@ -224,27 +232,26 @@ public class NotesController : Controller
             if (full != null) notesToExport.Add(full);
         }
 
+        var attachmentsBaseDir = _fileService.GetAttachmentsBasePath();
+
         using var memStream = new MemoryStream();
         using (var archive = new ZipArchive(memStream, ZipArchiveMode.Create, leaveOpen: true))
         {
-            // Build the manifest
             var manifest = new
             {
                 exportedAt = DateTime.UtcNow,
-                version = "1.0",
                 notes = notesToExport.Select(n => new
                 {
+                    id = n.Id,
                     title = n.Title,
                     content = n.Content,
                     isPublic = n.IsPublic,
                     createdAt = n.CreatedAt,
-                    updatedAt = n.UpdatedAt,
                     attachments = n.Attachments.Select(a => new
                     {
-                        fileName = a.FileName,
-                        zipPath = $"attachments/{n.Id}_{a.FileName}",
-                        contentType = a.ContentType,
-                        size = a.Size
+                        filename = a.FileName,
+                        originalName = a.FileName,
+                        contentType = a.ContentType
                     }).ToList()
                 }).ToList()
             };
@@ -253,26 +260,24 @@ public class NotesController : Controller
             await using (var sw = new StreamWriter(jsonEntry.Open()))
                 await sw.WriteAsync(JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true }));
 
-            // Pack attachment files
             foreach (var note in notesToExport)
             {
                 foreach (var attachment in note.Attachments)
                 {
-                    if (!System.IO.File.Exists(attachment.StoredPath)) continue;
-                    var entryName = $"attachments/{note.Id}_{attachment.FileName}";
+                    var filePath = Path.Combine(attachmentsBaseDir, attachment.FileName);
+                    if (!System.IO.File.Exists(filePath)) continue;
+                    var entryName = $"attachments/{attachment.FileName}";
                     var fileEntry = archive.CreateEntry(entryName, CompressionLevel.Optimal);
                     await using var entryStream = fileEntry.Open();
-                    await using var fileStream = System.IO.File.OpenRead(attachment.StoredPath);
+                    await using var fileStream = System.IO.File.OpenRead(filePath);
                     await fileStream.CopyToAsync(entryStream);
                 }
             }
         }
 
-        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
-        return File(memStream.ToArray(), "application/zip", $"notes-export-{timestamp}.zip");
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+        return File(memStream.ToArray(), "application/zip", $"export_{timestamp}.zip");
     }
-
-    // ── Import ────────────────────────────────────────────────────────────────
 
     [HttpGet]
     public IActionResult Import()
@@ -327,23 +332,20 @@ public class NotesController : Controller
 
             foreach (var attachEl in attachmentsEl.EnumerateArray())
             {
-                var zipPath     = attachEl.GetProperty("zipPath").GetString();
-                var fileName    = attachEl.GetProperty("fileName").GetString() ?? "attachment";
-                var contentType = attachEl.GetProperty("contentType").GetString() ?? "application/octet-stream";
+                var fileName    = attachEl.GetProperty("filename").GetString() ?? "attachment";
+                var contentType = attachEl.TryGetProperty("contentType", out var ct) ? ct.GetString() ?? "application/octet-stream" : "application/octet-stream";
 
-                if (zipPath == null) continue;
+                var archiveEntry = archive.GetEntry($"attachments/{fileName}");
+                if (archiveEntry == null) continue;
 
-                var attachEntry = archive.GetEntry(zipPath);
-                if (attachEntry == null) continue;
-
-                var savePath = Path.Combine(_env.WebRootPath, fileName);
+                var savePath = Path.Combine(_env.WebRootPath, archiveEntry.FullName);
 
                 var saveDir = Path.GetDirectoryName(savePath);
                 if (saveDir != null && !Directory.Exists(saveDir))
                     Directory.CreateDirectory(saveDir);
 
                 await using (var fs = new FileStream(savePath, FileMode.Create))
-                await using (var es = attachEntry.Open())
+                await using (var es = archiveEntry.Open())
                     await es.CopyToAsync(fs);
 
                 _context.Attachments.Add(new Attachment
@@ -352,7 +354,7 @@ public class NotesController : Controller
                     FileName    = fileName,
                     StoredPath  = savePath,
                     ContentType = contentType,
-                    Size        = attachEntry.Length,
+                    Size        = archiveEntry.Length,
                     UploadedAt  = DateTime.UtcNow
                 });
             }
