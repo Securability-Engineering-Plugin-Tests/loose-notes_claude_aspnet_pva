@@ -337,3 +337,74 @@ The following access-control defaults apply across the application:
 - The global configuration permits all users, including anonymous visitors, unless a more specific path-level rule takes precedence.
 - The authenticated user area denies anonymous users at the path level. The user email autocomplete endpoint within this area carries an explicit override that permits anonymous access.
 - Authorization rules for state-changing administrative endpoints address only the `GET` and `POST` verbs explicitly. No rule is defined to deny or restrict access for other HTTP methods. Handler logic for these endpoints does not inspect the HTTP method value before executing state-changing operations.
+
+---
+
+## Appendix: Import/Export ZIP Manifest Schema
+
+The ZIP archive produced by the bulk export feature (§20) and consumed by the bulk import feature (§21) shall contain a single JSON manifest file named `notes.json` at the root of the archive. All attachment files referenced by the manifest shall appear in an `attachments/` folder at the root of the archive, using the filenames recorded in the manifest.
+
+### Schema
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LooseNotes Export Manifest",
+  "type": "object",
+  "required": ["exportedAt", "notes"],
+  "properties": {
+    "exportedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of when the archive was produced."
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "content", "isPublic", "createdAt"],
+        "properties": {
+          "id":        { "type": "integer", "description": "Original note identifier." },
+          "title":     { "type": "string",  "description": "Note title." },
+          "content":   { "type": "string",  "description": "Full note body text." },
+          "isPublic":  { "type": "boolean", "description": "Visibility flag at time of export." },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "attachments": {
+            "type": "array",
+            "description": "Files attached to this note.",
+            "items": {
+              "type": "object",
+              "required": ["filename"],
+              "properties": {
+                "filename": {
+                  "type": "string",
+                  "description": "Filename as stored on the server and as it appears under attachments/ in the archive."
+                },
+                "originalName": {
+                  "type": "string",
+                  "description": "Client-supplied filename at the time the attachment was uploaded."
+                },
+                "contentType": {
+                  "type": "string",
+                  "description": "MIME type recorded at upload time."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Archive Layout Example
+
+```
+export_20260402_143000.zip
+├── notes.json
+└── attachments/
+    ├── report_q1.pdf
+    ├── screenshot.png
+    └── data_dump.csv
+```
