@@ -1,7 +1,11 @@
+using LooseNotes.Data;
+using LooseNotes.Models;
 using LooseNotes.Models.ViewModels;
 using LooseNotes.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.IO.Compression;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace LooseNotes.Controllers;
 
@@ -9,12 +13,16 @@ public class NotesController : Controller
 {
     private readonly NoteService _noteService;
     private readonly FileService _fileService;
+    private readonly ApplicationDbContext _context;
+    private readonly IWebHostEnvironment _env;
     private readonly ILogger<NotesController> _logger;
 
-    public NotesController(NoteService noteService, FileService fileService, ILogger<NotesController> logger)
+    public NotesController(NoteService noteService, FileService fileService, ApplicationDbContext context, IWebHostEnvironment env, ILogger<NotesController> logger)
     {
         _noteService = noteService;
         _fileService = fileService;
+        _context = context;
+        _env = env;
         _logger = logger;
     }
 
@@ -178,5 +186,182 @@ public class NotesController : Controller
     {
         var (data, contentType, name) = _fileService.DownloadFile(filePath, fileName);
         return File(data, contentType, name);
+    }
+
+    // ── Export ────────────────────────────────────────────────────────────────
+
+    [HttpGet]
+    public async Task<IActionResult> Export()
+    {
+        if (!User.Identity!.IsAuthenticated)
+            return RedirectToAction("Login", "Account");
+
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var notes = await _noteService.GetUserNotesAsync(userId);
+        return View(notes);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Export(List<int> selectedNoteIds)
+    {
+        if (!User.Identity!.IsAuthenticated)
+            return RedirectToAction("Login", "Account");
+
+        if (selectedNoteIds == null || !selectedNoteIds.Any())
+        {
+            TempData["Error"] = "Please select at least one note to export.";
+            return RedirectToAction("Export");
+        }
+
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var allNotes = await _noteService.GetUserNotesAsync(userId);
+        var selectedIds = selectedNoteIds.ToHashSet();
+
+        var notesToExport = new List<Note>();
+        foreach (var note in allNotes.Where(n => selectedIds.Contains(n.Id)))
+        {
+            var full = await _noteService.GetNoteByIdAsync(note.Id);
+            if (full != null) notesToExport.Add(full);
+        }
+
+        using var memStream = new MemoryStream();
+        using (var archive = new ZipArchive(memStream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            // Build the manifest
+            var manifest = new
+            {
+                exportedAt = DateTime.UtcNow,
+                version = "1.0",
+                notes = notesToExport.Select(n => new
+                {
+                    title = n.Title,
+                    content = n.Content,
+                    isPublic = n.IsPublic,
+                    createdAt = n.CreatedAt,
+                    updatedAt = n.UpdatedAt,
+                    attachments = n.Attachments.Select(a => new
+                    {
+                        fileName = a.FileName,
+                        zipPath = $"attachments/{n.Id}_{a.FileName}",
+                        contentType = a.ContentType,
+                        size = a.Size
+                    }).ToList()
+                }).ToList()
+            };
+
+            var jsonEntry = archive.CreateEntry("notes.json", CompressionLevel.Optimal);
+            await using (var sw = new StreamWriter(jsonEntry.Open()))
+                await sw.WriteAsync(JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true }));
+
+            // Pack attachment files
+            foreach (var note in notesToExport)
+            {
+                foreach (var attachment in note.Attachments)
+                {
+                    if (!System.IO.File.Exists(attachment.StoredPath)) continue;
+                    var entryName = $"attachments/{note.Id}_{attachment.FileName}";
+                    var fileEntry = archive.CreateEntry(entryName, CompressionLevel.Optimal);
+                    await using var entryStream = fileEntry.Open();
+                    await using var fileStream = System.IO.File.OpenRead(attachment.StoredPath);
+                    await fileStream.CopyToAsync(entryStream);
+                }
+            }
+        }
+
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+        return File(memStream.ToArray(), "application/zip", $"notes-export-{timestamp}.zip");
+    }
+
+    // ── Import ────────────────────────────────────────────────────────────────
+
+    [HttpGet]
+    public IActionResult Import()
+    {
+        if (!User.Identity!.IsAuthenticated)
+            return RedirectToAction("Login", "Account");
+
+        return View();
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Import(IFormFile zipFile)
+    {
+        if (!User.Identity!.IsAuthenticated)
+            return RedirectToAction("Login", "Account");
+
+        if (zipFile == null || zipFile.Length == 0)
+        {
+            TempData["Error"] = "Please select a ZIP file to import.";
+            return View();
+        }
+
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        int importedCount = 0;
+
+        await using var zipStream = zipFile.OpenReadStream();
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+
+        var jsonEntry = archive.GetEntry("notes.json");
+        if (jsonEntry == null)
+        {
+            TempData["Error"] = "Invalid archive: notes.json not found.";
+            return View();
+        }
+
+        string json;
+        using (var reader = new StreamReader(jsonEntry.Open()))
+            json = await reader.ReadToEndAsync();
+
+        using var doc = JsonDocument.Parse(json);
+        var notesArray = doc.RootElement.GetProperty("notes");
+
+        foreach (var noteEl in notesArray.EnumerateArray())
+        {
+            var title    = noteEl.GetProperty("title").GetString()   ?? "(untitled)";
+            var content  = noteEl.GetProperty("content").GetString() ?? "";
+            var isPublic = noteEl.GetProperty("isPublic").GetBoolean();
+
+            var createdNote = await _noteService.CreateNoteAsync(userId, title, content, isPublic);
+
+            if (!noteEl.TryGetProperty("attachments", out var attachmentsEl)) { importedCount++; continue; }
+
+            foreach (var attachEl in attachmentsEl.EnumerateArray())
+            {
+                var zipPath     = attachEl.GetProperty("zipPath").GetString();
+                var fileName    = attachEl.GetProperty("fileName").GetString() ?? "attachment";
+                var contentType = attachEl.GetProperty("contentType").GetString() ?? "application/octet-stream";
+
+                if (zipPath == null) continue;
+
+                var attachEntry = archive.GetEntry(zipPath);
+                if (attachEntry == null) continue;
+
+                var savePath = Path.Combine(_env.WebRootPath, fileName);
+
+                var saveDir = Path.GetDirectoryName(savePath);
+                if (saveDir != null && !Directory.Exists(saveDir))
+                    Directory.CreateDirectory(saveDir);
+
+                await using (var fs = new FileStream(savePath, FileMode.Create))
+                await using (var es = attachEntry.Open())
+                    await es.CopyToAsync(fs);
+
+                _context.Attachments.Add(new Attachment
+                {
+                    NoteId      = createdNote.Id,
+                    FileName    = fileName,
+                    StoredPath  = savePath,
+                    ContentType = contentType,
+                    Size        = attachEntry.Length,
+                    UploadedAt  = DateTime.UtcNow
+                });
+            }
+
+            importedCount++;
+        }
+
+        await _context.SaveChangesAsync();
+        TempData["Success"] = $"Successfully imported {importedCount} note(s).";
+        return RedirectToAction("Index");
     }
 }
