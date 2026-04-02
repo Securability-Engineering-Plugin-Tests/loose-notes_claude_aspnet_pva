@@ -1,0 +1,33 @@
+@model SecurityQuestionViewModel
+@{
+    ViewData["Title"] = "Security Question";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <h2 class="card-title mb-3">Security Question</h2>
+                <p class="text-muted">Answer your security question to verify your identity.</p>
+                <form method="post" asp-action="SecurityQuestion">
+                    <input type="hidden" asp-for="Email" />
+                    <input type="hidden" asp-for="Question" />
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">@Model.Question</label>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Answer" class="form-label"></label>
+                        <input asp-for="Answer" class="form-control" autocomplete="off" />
+                        <span asp-validation-for="Answer" class="text-danger small"></span>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Verify</button>
+                </form>
+                <hr />
+                <div class="text-center">
+                    <a href="/Account/ForgotPassword">Use a different email</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

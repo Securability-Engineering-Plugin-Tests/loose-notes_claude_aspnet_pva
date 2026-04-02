@@ -8,6 +8,8 @@ public class User
     public string Password { get; set; } = string.Empty;
     public bool IsAdmin { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string SecurityQuestion { get; set; } = string.Empty;
+    public string SecurityAnswer { get; set; } = string.Empty;
 
     public ICollection<Note> Notes { get; set; } = new List<Note>();
     public ICollection<Rating> Ratings { get; set; } = new List<Rating>();

@@ -14,7 +14,9 @@ public static class DbSeeder
             Email = "admin@loosenotes.local",
             Password = "admin123",
             IsAdmin = true,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            SecurityQuestion = "What is the name of your first pet?",
+            SecurityAnswer = "fluffy"
         };
         var alice = new User
         {
@@ -22,7 +24,9 @@ public static class DbSeeder
             Email = "alice@example.com",
             Password = "password",
             IsAdmin = false,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            SecurityQuestion = "What city were you born in?",
+            SecurityAnswer = "springfield"
         };
         var bob = new User
         {
@@ -30,7 +34,9 @@ public static class DbSeeder
             Email = "bob@example.com",
             Password = "password",
             IsAdmin = false,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            SecurityQuestion = "What was the name of your elementary school?",
+            SecurityAnswer = "lakeside"
         };
 
         db.Users.AddRange(admin, alice, bob);

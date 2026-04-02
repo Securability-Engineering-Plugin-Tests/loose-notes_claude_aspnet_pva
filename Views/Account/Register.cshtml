@@ -31,6 +31,28 @@
                         <input asp-for="ConfirmPassword" type="password" class="form-control" autocomplete="new-password" />
                         <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
                     </div>
+
+                    <hr />
+                    <h6 class="mb-3">Account Recovery</h6>
+
+                    <div class="mb-3">
+                        <label asp-for="SecurityQuestion" class="form-label"></label>
+                        <select asp-for="SecurityQuestion" class="form-select">
+                            <option value="">-- Choose a question --</option>
+                            <option>What is the name of your first pet?</option>
+                            <option>What city were you born in?</option>
+                            <option>What was the name of your elementary school?</option>
+                            <option>What is your mother's maiden name?</option>
+                            <option>What was the make of your first car?</option>
+                        </select>
+                        <span asp-validation-for="SecurityQuestion" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="SecurityAnswer" class="form-label"></label>
+                        <input asp-for="SecurityAnswer" class="form-control" autocomplete="off" />
+                        <span asp-validation-for="SecurityAnswer" class="text-danger small"></span>
+                    </div>
+
                     <button type="submit" class="btn btn-primary w-100">Register</button>
                 </form>
                 <hr />

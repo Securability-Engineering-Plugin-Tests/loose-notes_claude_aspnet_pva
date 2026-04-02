@@ -115,6 +115,16 @@ public class UserService
         return token;
     }
 
+    public async Task SetSecurityQuestionAsync(int userId, string question, string answer)
+    {
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null) throw new Exception("User not found");
+
+        user.SecurityQuestion = question;
+        user.SecurityAnswer = answer.Trim().ToLowerInvariant();
+        await _context.SaveChangesAsync();
+    }
+
     public async Task<bool> ResetPasswordAsync(string token, string newPassword)
     {
         var resetToken = await _context.PasswordResetTokens

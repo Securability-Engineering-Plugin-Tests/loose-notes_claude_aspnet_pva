@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.Text;
 
 namespace LooseNotes.Controllers;
 
@@ -81,7 +82,8 @@ public class AccountController : Controller
             return View(model);
         }
 
-        await _userService.RegisterAsync(model.Username, model.Email, model.Password);
+        var user = await _userService.RegisterAsync(model.Username, model.Email, model.Password);
+        await _userService.SetSecurityQuestionAsync(user.Id, model.SecurityQuestion, model.SecurityAnswer);
         TempData["Success"] = "Account created successfully. Please log in.";
         return RedirectToAction("Login");
     }
@@ -106,18 +108,54 @@ public class AccountController : Controller
         if (!ModelState.IsValid) return View(model);
 
         var user = await _userService.GetByEmailAsync(model.Email);
-        if (user != null)
+        if (user == null || string.IsNullOrEmpty(user.SecurityQuestion))
         {
-            var token = await _userService.GeneratePasswordResetTokenAsync(user.Id);
-            TempData["ResetToken"] = token;
-            TempData["Info"] = $"Password reset token: {token} (In production this would be sent via email)";
-        }
-        else
-        {
-            TempData["Info"] = "If that email is registered, you will receive reset instructions.";
+            TempData["Error"] = "No account with that email address was found, or no security question is set.";
+            return View(model);
         }
 
-        return RedirectToAction("ResetPassword");
+        var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(user.SecurityAnswer));
+        Response.Cookies.Append("sqval", encoded);
+
+        return RedirectToAction("SecurityQuestion", new { email = model.Email });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> SecurityQuestion(string email)
+    {
+        var user = await _userService.GetByEmailAsync(email);
+        if (user == null) return RedirectToAction("ForgotPassword");
+
+        return View(new SecurityQuestionViewModel
+        {
+            Email = email,
+            Question = user.SecurityQuestion
+        });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> SecurityQuestion(SecurityQuestionViewModel model)
+    {
+        var user = await _userService.GetByEmailAsync(model.Email);
+        if (user == null) return RedirectToAction("ForgotPassword");
+
+        model.Question = user.SecurityQuestion;
+
+        if (!ModelState.IsValid) return View(model);
+
+        Request.Cookies.TryGetValue("sqval", out var encoded);
+        var expected = string.IsNullOrEmpty(encoded)
+            ? string.Empty
+            : Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
+
+        if (!string.Equals(expected, model.Answer.Trim().ToLowerInvariant(), StringComparison.Ordinal))
+        {
+            ModelState.AddModelError("Answer", "The answer you provided is incorrect.");
+            return View(model);
+        }
+
+        ViewBag.RecoveredPassword = user.Password;
+        return View("PasswordRecovered", user.Password);
     }
 
     [HttpGet]
@@ -155,7 +193,8 @@ public class AccountController : Controller
         return View(new ProfileViewModel
         {
             Username = user.Username,
-            Email = user.Email
+            Email = user.Email,
+            SecurityQuestion = user.SecurityQuestion,
         });
     }
 
@@ -188,6 +227,9 @@ public class AccountController : Controller
         }
 
         await _userService.UpdateProfileAsync(userId, model.Username, model.Email, newPassword);
+
+        if (!string.IsNullOrWhiteSpace(model.SecurityQuestion) && !string.IsNullOrWhiteSpace(model.SecurityAnswer))
+            await _userService.SetSecurityQuestionAsync(userId, model.SecurityQuestion, model.SecurityAnswer);
 
         var claims = new List<Claim>
         {

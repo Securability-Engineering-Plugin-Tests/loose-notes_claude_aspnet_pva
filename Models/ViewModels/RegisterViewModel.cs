@@ -18,4 +18,12 @@ public class RegisterViewModel
     [Required]
     [Compare("Password", ErrorMessage = "Passwords do not match.")]
     public string ConfirmPassword { get; set; } = string.Empty;
+
+    [Required]
+    [Display(Name = "Security Question")]
+    public string SecurityQuestion { get; set; } = string.Empty;
+
+    [Required]
+    [Display(Name = "Security Answer")]
+    public string SecurityAnswer { get; set; } = string.Empty;
 }

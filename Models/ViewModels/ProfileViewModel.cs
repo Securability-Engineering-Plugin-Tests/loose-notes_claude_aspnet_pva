@@ -15,4 +15,10 @@ public class ProfileViewModel
     public string? CurrentPassword { get; set; }
     public string? NewPassword { get; set; }
     public string? ConfirmNewPassword { get; set; }
+
+    [Display(Name = "Security Question")]
+    public string? SecurityQuestion { get; set; }
+
+    [Display(Name = "Security Answer")]
+    public string? SecurityAnswer { get; set; }
 }

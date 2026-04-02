@@ -40,6 +40,25 @@
                         <input asp-for="ConfirmNewPassword" type="password" class="form-control" />
                     </div>
 
+                    <hr />
+                    <h5>Security Question <small class="text-muted fs-6">(optional — leave blank to keep existing)</small></h5>
+
+                    <div class="mb-3">
+                        <label asp-for="SecurityQuestion" class="form-label"></label>
+                        <select asp-for="SecurityQuestion" class="form-select">
+                            <option value="">-- Keep existing --</option>
+                            <option>What is the name of your first pet?</option>
+                            <option>What city were you born in?</option>
+                            <option>What was the name of your elementary school?</option>
+                            <option>What is your mother's maiden name?</option>
+                            <option>What was the make of your first car?</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="SecurityAnswer" class="form-label"></label>
+                        <input asp-for="SecurityAnswer" class="form-control" autocomplete="off" />
+                    </div>
+
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                     <a href="/Notes" class="btn btn-link">Cancel</a>
                 </form>
